@@ -1,0 +1,51 @@
+# Copy to config.yaml and fill in.
+# Note: location is set via the bot's /setlocation command, not here.
+
+telegram:
+  # From @BotFather
+  bot_token: "PASTE_BOT_TOKEN"
+  # Your Telegram user ID — only this user can talk to the bot.
+  # To find it: message @userinfobot on Telegram.
+  authorized_user_id: 123456789
+  # Optional: how the bot greets you on /start. Leave blank for a generic greeting.
+  display_name: ""
+
+briefing:
+  # Daily morning briefing time (24h, local Mac time)
+  time: "08:00"
+  include_weather: true
+  include_trash: true
+  include_calendar_today: true
+
+email_scan:
+  # How often to poll Gmail for events (minutes)
+  poll_minutes: 30
+  # Only scan emails with these labels (empty list = scan inbox)
+  labels: ["INBOX"]
+  # Don't re-process emails older than this many days on first run
+  initial_lookback_days: 2
+  # Calendar to add events to (calendar ID — usually "primary")
+  target_calendar_id: "primary"
+
+llm:
+  # Anthropic API key (used for parsing emails into events).
+  # Leave empty to disable email auto-scan.
+  anthropic_api_key: ""
+  model: "claude-sonnet-4-6"
+
+homekit:
+  # Names of Apple Shortcuts you've created in the Shortcuts app.
+  # The bot will call `shortcuts run "<name>"`.
+  # See shortcuts-to-create.md for the list to set up first.
+  lights:
+    on: "Lights On"
+    off: "Lights Off"
+    scenes:
+      movie: "Movie Night"
+      bedtime: "Bedtime"
+  locks:
+    front_door:
+      lock: "Lock Front Door"
+      unlock: "Unlock Front Door"
+      # Locks always require a confirmation button press
+      require_confirmation: true

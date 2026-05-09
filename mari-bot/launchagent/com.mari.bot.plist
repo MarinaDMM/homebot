@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mari.bot</string>
+
+  <!-- ⚠️ EDIT these three paths to match your install location. -->
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USERNAME/mari-bot</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/YOUR_USERNAME/mari-bot/.venv/bin/python</string>
+    <string>/Users/YOUR_USERNAME/mari-bot/bot.py</string>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USERNAME/mari-bot/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USERNAME/mari-bot/launchd.err.log</string>
+
+  <!-- Auto-restart on crash + start on login -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Don't busy-loop if it's failing fast -->
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>
