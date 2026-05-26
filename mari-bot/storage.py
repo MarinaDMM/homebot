@@ -14,6 +14,8 @@ def init_db():
         c.executescript("""
         CREATE TABLE IF NOT EXISTS reminders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            chat_id INTEGER,
             text TEXT NOT NULL,
             schedule_kind TEXT NOT NULL,    -- 'once' | 'cron'
             schedule_spec TEXT NOT NULL,    -- ISO datetime for once, cron expr for cron
@@ -36,12 +38,21 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
             value TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, key)
         );
         """)
+    # Migrate: add columns to reminders if upgrading from single-tenant schema
+    with _conn() as c:
+        for col, typ in [("user_id", "INTEGER"), ("chat_id", "INTEGER")]:
+            try:
+                c.execute(f"ALTER TABLE reminders ADD COLUMN {col} {typ}")
+            except Exception:
+                pass  # column already exists
 
 
 @contextmanager
@@ -57,23 +68,37 @@ def _conn():
 
 # ---------- reminders ----------
 
-def add_reminder(text: str, schedule_kind: str, schedule_spec: str, tz: str = "Europe/Amsterdam") -> int:
+def add_reminder(user_id: int, chat_id: int, text: str, schedule_kind: str, schedule_spec: str,
+                 tz: str = "Europe/Amsterdam") -> int:
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO reminders (text, schedule_kind, schedule_spec, timezone, created_at) VALUES (?, ?, ?, ?, ?)",
-            (text, schedule_kind, schedule_spec, tz, datetime.utcnow().isoformat()),
+            "INSERT INTO reminders (user_id, chat_id, text, schedule_kind, schedule_spec, timezone, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, chat_id, text, schedule_kind, schedule_spec, tz, datetime.utcnow().isoformat()),
         )
         return cur.lastrowid
 
 
-def list_reminders():
+def list_reminders(user_id: int):
     with _conn() as c:
-        return [dict(r) for r in c.execute("SELECT * FROM reminders WHERE active = 1 ORDER BY id")]
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM reminders WHERE active = 1 AND user_id = ? ORDER BY id", (user_id,)
+        )]
 
 
-def delete_reminder(rid: int) -> bool:
+def list_all_active_reminders():
+    """All active reminders across all users — used for scheduler hydration on startup."""
     with _conn() as c:
-        cur = c.execute("UPDATE reminders SET active = 0 WHERE id = ?", (rid,))
+        return [dict(r) for r in c.execute(
+            "SELECT * FROM reminders WHERE active = 1 ORDER BY id"
+        )]
+
+
+def delete_reminder(user_id: int, rid: int) -> bool:
+    with _conn() as c:
+        cur = c.execute(
+            "UPDATE reminders SET active = 0 WHERE id = ? AND user_id = ?", (rid, user_id)
+        )
         return cur.rowcount > 0
 
 
@@ -88,7 +113,8 @@ def is_email_processed(message_id: str) -> bool:
 def mark_email_processed(message_id: str, event_added: bool = False, calendar_event_id: str | None = None):
     with _conn() as c:
         c.execute(
-            "INSERT OR REPLACE INTO processed_emails (message_id, processed_at, event_added, calendar_event_id) VALUES (?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO processed_emails (message_id, processed_at, event_added, calendar_event_id)"
+            " VALUES (?, ?, ?, ?)",
             (message_id, datetime.utcnow().isoformat(), 1 if event_added else 0, calendar_event_id),
         )
 
@@ -112,11 +138,13 @@ def pop_confirmation(token: str):
         return row["kind"], json.loads(row["payload"])
 
 
-# ---------- settings (key/value, JSON-encoded) ----------
+# ---------- per-user settings ----------
 
-def get_setting(key: str, default=None):
+def get_user_setting(user_id: int, key: str, default=None):
     with _conn() as c:
-        row = c.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        row = c.execute(
+            "SELECT value FROM user_settings WHERE user_id = ? AND key = ?", (user_id, key)
+        ).fetchone()
         if not row:
             return default
         try:
@@ -125,14 +153,35 @@ def get_setting(key: str, default=None):
             return row["value"]
 
 
-def set_setting(key: str, value):
+def set_user_setting(user_id: int, key: str, value):
     with _conn() as c:
         c.execute(
-            "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
-            (key, json.dumps(value), datetime.utcnow().isoformat()),
+            "INSERT OR REPLACE INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)",
+            (user_id, key, json.dumps(value), datetime.utcnow().isoformat()),
         )
 
 
-def get_location() -> dict | None:
-    """Returns {postcode, house_number, lat, lon, address} or None if unset."""
-    return get_setting("location")
+def get_location(user_id: int) -> dict | None:
+    """Returns {postcode, house_number, lat, lon, address, chat_id} or None."""
+    return get_user_setting(user_id, "location")
+
+
+def set_location(user_id: int, chat_id: int, data: dict):
+    """Store location; chat_id is included so the morning briefing knows where to send."""
+    set_user_setting(user_id, "location", {**data, "chat_id": chat_id})
+
+
+def list_users_with_location() -> list[tuple[int, dict]]:
+    """Returns [(user_id, location_dict)] for every user who has set a location."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT user_id, value FROM user_settings WHERE key = 'location'"
+        ).fetchall()
+    result = []
+    for row in rows:
+        try:
+            loc = json.loads(row["value"])
+            result.append((row["user_id"], loc))
+        except Exception:
+            pass
+    return result

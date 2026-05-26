@@ -8,18 +8,18 @@
 
   <!-- ⚠️ EDIT these three paths to match your install location. -->
   <key>WorkingDirectory</key>
-  <string>/Users/YOUR_USERNAME/mari-bot</string>
+  <string>/Users/marina.dedikova/mari-bot/mari-bot</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/YOUR_USERNAME/mari-bot/.venv/bin/python</string>
-    <string>/Users/YOUR_USERNAME/mari-bot/bot.py</string>
+    <string>/Users/marina.dedikova/mari-bot/mari-bot/.venv/bin/python</string>
+    <string>/Users/marina.dedikova/mari-bot/mari-bot/bot.py</string>
   </array>
 
   <key>StandardOutPath</key>
-  <string>/Users/YOUR_USERNAME/mari-bot/launchd.out.log</string>
+  <string>/Users/marina.dedikova/mari-bot/mari-bot/launchd.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/YOUR_USERNAME/mari-bot/launchd.err.log</string>
+  <string>/Users/marina.dedikova/mari-bot/mari-bot/launchd.err.log</string>
 
   <!-- Auto-restart on crash + start on login -->
   <key>KeepAlive</key>
